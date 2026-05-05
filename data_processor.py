@@ -85,3 +85,75 @@ class DataProcessor:
             lead.get("Name") not in ["Unknown", "N/A", ""] and
             lead.get("LinkedIn URL") != "N/A"
         )
+
+
+class HunterDataProcessor:
+    @staticmethod
+    def clean_and_normalize(leads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Clean and normalize Hunter.io lead data."""
+        processed_leads = []
+
+        for lead in leads:
+            try:
+                processed_lead = {
+                    "Name": HunterDataProcessor._clean_string(lead.get("name", "Unknown")),
+                    "Email": HunterDataProcessor._clean_email(lead.get("email", "N/A")),
+                    "Domain": HunterDataProcessor._clean_string(lead.get("domain", "N/A")),
+                    "Confidence": lead.get("confidence", 0),
+                    "Phone": HunterDataProcessor._clean_phone(lead.get("phone", "N/A")),
+                    "Job Title": HunterDataProcessor._clean_string(lead.get("job_title", "N/A")),
+                    "Company": HunterDataProcessor._clean_string(lead.get("company", "N/A")),
+                    "Location": HunterDataProcessor._clean_string(lead.get("location", "N/A")),
+                    "Extraction Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Source": "Hunter.io"
+                }
+
+                if processed_lead["Name"] != "Unknown" and processed_lead["Email"] != "N/A":
+                    processed_leads.append(processed_lead)
+                    logger.debug(f"Processed Hunter lead: {processed_lead['Name']} ({processed_lead['Email']})")
+                else:
+                    logger.warning("Skipped Hunter lead with unknown name or email")
+
+            except Exception as e:
+                logger.warning(f"Failed to process Hunter lead: {str(e)}")
+                continue
+
+        logger.info(f"Processed {len(processed_leads)} Hunter leads")
+        return processed_leads
+
+    @staticmethod
+    def _clean_string(value: str) -> str:
+        """Clean and normalize string values."""
+        if not value or value == "N/A":
+            return "N/A"
+
+        cleaned = value.strip()
+        return cleaned if cleaned else "N/A"
+
+    @staticmethod
+    def _clean_email(email: str) -> str:
+        """Validate and clean email."""
+        if not email or email == "N/A":
+            return "N/A"
+
+        email = email.strip().lower()
+        if "@" in email and "." in email.split("@")[-1]:
+            return email
+        return "N/A"
+
+    @staticmethod
+    def _clean_phone(phone: str) -> str:
+        """Clean and normalize phone number."""
+        if not phone or phone == "N/A":
+            return "N/A"
+
+        cleaned = "".join(c for c in phone if c.isdigit() or c in "+-() ")
+        return cleaned.strip() if cleaned else "N/A"
+
+    @staticmethod
+    def validate_lead(lead: Dict[str, Any]) -> bool:
+        """Check if Hunter lead has minimum required data."""
+        return (
+            lead.get("Name") not in ["Unknown", "N/A", ""] and
+            lead.get("Email") != "N/A"
+        )

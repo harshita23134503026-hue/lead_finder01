@@ -11,8 +11,10 @@ logger = logging.getLogger(__name__)
 
 class CSVExporter:
     @staticmethod
-    def export(leads: List[Dict[str, Any]], output_file: str = None) -> str:
+    def export(leads: List[Dict[str, Any]], output_file: str = None, csv_headers: List[str] = None) -> str:
         """Export leads to CSV file."""
+        if csv_headers is None:
+            csv_headers = config.CSV_HEADERS
 
         if output_file is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -30,7 +32,7 @@ class CSVExporter:
             file_exists = os.path.isfile(output_file)
 
             with open(output_file, "a", newline="", encoding="utf-8") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=config.CSV_HEADERS)
+                writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
 
                 if not file_exists:
                     writer.writeheader()

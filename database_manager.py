@@ -82,11 +82,27 @@ class DatabaseManager:
                     processing_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
 
+                CREATE TABLE IF NOT EXISTS hunter_leads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    domain TEXT,
+                    confidence REAL,
+                    first_name TEXT,
+                    last_name TEXT,
+                    phone TEXT,
+                    company TEXT,
+                    job_title TEXT,
+                    verified BOOLEAN DEFAULT 0,
+                    extraction_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_email_sent_recipient ON email_sent(recipient_email);
                 CREATE INDEX IF NOT EXISTS idx_email_sent_campaign ON email_sent(campaign_id);
                 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
                 CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
                 CREATE INDEX IF NOT EXISTS idx_leads_quality_score ON leads_quality(quality_score);
+                CREATE INDEX IF NOT EXISTS idx_hunter_leads_domain ON hunter_leads(domain);
+                CREATE INDEX IF NOT EXISTS idx_hunter_leads_verified ON hunter_leads(verified);
             """)
             conn.commit()
             logger.info(f"Database initialized at {self.db_path}")
@@ -255,6 +271,81 @@ class DatabaseManager:
             """, (email, linkedin_url, quality_score, response_rate))
             conn.commit()
             return True
+        finally:
+            conn.close()
+
+    def save_hunter_lead(self, email: str, domain: str, confidence: float = 0,
+                        first_name: str = "", last_name: str = "", phone: str = "N/A",
+                        company: str = "N/A", job_title: str = "N/A", verified: bool = False) -> bool:
+        """Save Hunter.io lead."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT OR REPLACE INTO hunter_leads
+                (email, domain, confidence, first_name, last_name, phone, company, job_title, verified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (email, domain, confidence, first_name, last_name, phone, company, job_title, verified))
+            conn.commit()
+            logger.debug(f"Saved Hunter lead: {email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save Hunter lead: {str(e)}")
+            return False
+        finally:
+            conn.close()
+
+    def get_hunter_lead(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get Hunter lead by email."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT email, domain, confidence, first_name, last_name, phone, company, job_title, verified
+                FROM hunter_leads WHERE email = ?
+            """, (email,))
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "email": row[0],
+                    "domain": row[1],
+                    "confidence": row[2],
+                    "first_name": row[3],
+                    "last_name": row[4],
+                    "phone": row[5],
+                    "company": row[6],
+                    "job_title": row[7],
+                    "verified": row[8]
+                }
+            return None
+        finally:
+            conn.close()
+
+    def get_hunter_leads_by_domain(self, domain: str) -> List[Dict[str, Any]]:
+        """Get all Hunter leads for a domain."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT email, domain, confidence, first_name, last_name, phone, company, job_title, verified
+                FROM hunter_leads WHERE domain = ?
+                ORDER BY confidence DESC
+            """, (domain,))
+            rows = cursor.fetchall()
+            return [
+                {
+                    "email": row[0],
+                    "domain": row[1],
+                    "confidence": row[2],
+                    "first_name": row[3],
+                    "last_name": row[4],
+                    "phone": row[5],
+                    "company": row[6],
+                    "job_title": row[7],
+                    "verified": row[8]
+                }
+                for row in rows
+            ]
         finally:
             conn.close()
 
